@@ -1,0 +1,270 @@
+# OmniPost AI - Implementation Plan
+
+## Project Overview
+Social media posting platform with AI transformation for LinkedIn and X (Twitter)
+
+## Tech Stack
+- **Frontend:** Next.js 15+ (App Router), TypeScript, NextAuth.js
+- **Backend:** Node.js, Express, BullMQ + Redis
+- **AI:** Vercel AI SDK / LangChain
+- **Database:** MongoDB with Mongoose
+
+---
+
+## Phase 1: Project Setup & Database
+
+### 1.1 Initialize Project Structure
+```
+/omnipost-ai
+  /apps
+    /web        (Next.js frontend)
+    /api        (Express backend)
+  /packages
+    /shared     (shared types, utils)
+```
+
+### 1.2 Database Schema (MongoDB)
+
+```typescript
+// models/Post.ts
+interface IPost {
+  userId: string;
+  baseContent: string;
+  platforms: [{
+    platform: 'linkedin' | 'x';
+    status: 'draft' | 'queued' | 'posted' | 'failed';
+    transformedContent: string;
+    platformPostId?: string;
+    error?: string;
+  }];
+  scheduledAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// models/User.ts
+interface IUser {
+  email: string;
+  name: string;
+  avatar?: string;
+  linkedinAccessToken?: string;
+  xAccessToken?: string;
+  linkedinProfileId?: string;
+  xUserId?: string;
+}
+```
+
+### 1.3 Environment Variables
+```
+MONGODB_URI=
+NEXTAUTH_SECRET=
+NEXTAUTH_URL=http://localhost:3000
+LINKEDIN_CLIENT_ID=
+LINKEDIN_CLIENT_SECRET=
+X_API_KEY=
+X_API_SECRET=
+REDIS_URL=
+OPENAI_API_KEY=
+```
+
+---
+
+## Phase 2: Authentication (NextAuth.js)
+
+### 2.1 Setup NextAuth
+- Configure OAuth providers for LinkedIn and X (Twitter)
+- Implement callbacks to store platform tokens
+- Create session management
+
+### 2.2 API Routes
+- `/api/auth/[...nextauth]` - Authentication handler
+- Session hooks for accessing user tokens
+
+---
+
+## Phase 3: Backend API (Express + BullMQ)
+
+### 3.1 API Endpoints
+
+```typescript
+// Routes
+POST /api/posts          - Create post with platform selection
+GET  /api/posts          - List user's posts
+GET  /api/posts/:id      - Get single post
+PUT  /api/posts/:id      - Update post
+DELETE /api/posts/:id    - Delete post
+POST /api/posts/:id/publish - Trigger queue job
+```
+
+### 3.2 Queue System (BullMQ)
+
+```typescript
+// Queue: social-post-queue
+interface PostJob {
+  postId: string;
+  platform: 'linkedin' | 'x';
+  content: string;
+  accessToken: string;
+}
+
+// Processors
+- linkedinPoster: Publish to LinkedIn API
+- xPoster: Publish to X API
+- retryHandler: Handle failed jobs with exponential backoff
+```
+
+### 3.3 Queue Configuration
+- Concurrency: 5
+- Retry attempts: 3
+- Backoff strategy: exponential
+- Remove on completion: false (keep for audit)
+
+---
+
+## Phase 4: AI Orchestration Layer
+
+### 4.1 Strategy Pattern Implementation
+
+```typescript
+// ai/strategies/LinkedInStrategy.ts
+- Expand on key professional takeaways
+- Add professional formatting
+- Include line breaks for readability
+- Add relevant professional hashtags
+
+// ai/strategies/XStrategy.ts
+- Keep under 280 characters
+- Punchy, engaging sentences
+- 2-3 relevant hashtags
+- No line breaks (compact format)
+
+// ai/AIController.ts
+- Route to appropriate strategy based on platform
+- Use Vercel AI SDK for streaming responses
+```
+
+### 4.2 AI Service Interface
+
+```typescript
+interface AIStrategy {
+  platform: 'linkedin' | 'x';
+  transform(content: string): Promise<string>;
+}
+
+class AITransformService {
+  transform(content: string, platforms: string[]): Promise<PlatformContent[]>;
+}
+```
+
+---
+
+## Phase 5: Frontend Development
+
+### 5.1 Components Structure
+
+```
+/components
+  /editor
+    RichTextEditor.tsx       - Base post editor (Tiptap/Quill)
+  /platform
+    PlatformSelector.tsx    - LinkedIn/X checkboxes
+  /preview
+    AIPreviewPane.tsx       - Side-by-side AI previews
+    PlatformCard.tsx         - Individual platform preview
+  /layout
+    Navbar.tsx
+    Sidebar.tsx
+```
+
+### 5.2 Pages
+
+```
+/app
+  /page.tsx                  - Dashboard
+  /editor/page.tsx           - Create new post
+  /posts/page.tsx            - Post list
+  /posts/[id]/page.tsx       - Post detail
+  /settings/page.tsx         - Account settings
+```
+
+### 5.3 State Management
+- React Query for server state
+- Zustand for UI state (selected platforms, editor state)
+
+### 5.4 Real-time Preview
+- Debounced API calls (300ms)
+- Optimistic UI updates
+- Loading states for AI transformation
+
+---
+
+## Phase 6: Social Media API Integration
+
+### 6.1 LinkedIn API
+- Share API endpoint
+- Post as user
+- Handle media uploads if needed
+
+### 6.2 X (Twitter) API v2
+- Tweets API endpoint
+- Handle character limits
+- Media upload if needed
+
+---
+
+## Phase 7: Testing & Deployment
+
+### 7.1 Testing Strategy
+- Unit tests for AI strategies
+- Integration tests for API endpoints
+- E2E tests for critical flows
+
+### 7.2 Deployment
+- Vercel for Next.js frontend
+- Railway/Render/DigitalOcean for backend + Redis
+- MongoDB Atlas for database
+
+---
+
+## Implementation Order
+
+1. Project scaffolding & database setup
+2. NextAuth configuration
+3. Backend API with basic CRUD
+4. AI transformation service
+5. Frontend editor & platform selector
+6. AI preview pane
+7. Queue system integration
+8. Social media API integration
+9. Testing & polish
+
+---
+
+## File Structure
+
+```
+/omnipost-ai
+├── apps/
+│   ├── web/                    # Next.js frontend
+│   │   ├── src/
+│   │   │   ├── app/
+│   │   │   ├── components/
+│   │   │   ├── lib/
+│   │   │   └── types/
+│   │   └── package.json
+│   └── api/                    # Express backend
+│       ├── src/
+│       │   ├── controllers/
+│       │   ├── routes/
+│       │   ├── services/
+│       │   ├── queue/
+│       │   ├── ai/
+│       │   └── index.ts
+│       └── package.json
+├── packages/
+│   └── shared/                 # Shared types & utilities
+├── docker-compose.yml
+├── .env.example
+├── README.md
+└── IMPLEMENTATION_PLAN.txt
+```
