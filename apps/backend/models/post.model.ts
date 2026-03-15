@@ -1,4 +1,4 @@
-import { Schema } from "mongoose";
+import mongoose, { Schema } from "mongoose";
 
 export const Platforms = {
   Linkedin: "linkedin",
@@ -33,3 +33,5 @@ const postSchema = new Schema({
   createdAt: { type: Date, required: true },
   updatedAt: { type: Date, required: true },
 });
+
+export const PostModel = mongoose.model("Post", postSchema);
